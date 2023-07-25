@@ -23,3 +23,18 @@ func NewStealthAddress(secret [32]byte) (*big.Int, *big.Int, common.Address) {
 	pubkey := ecdsa.PublicKey{Curve: curve, X: qX, Y: qY}
 	return pubX, pubY, crypto.PubkeyToAddress(pubkey)
 }
+
+func GenerateSecet(secret [32]byte) common.Address {
+	curve := secp256k1.S256()
+	//  s*G = S
+	pubX, pubY := curve.ScalarMult(GX, GY, secret[:])
+	pubkey := ecdsa.PublicKey{Curve: curve, X: pubX, Y: pubY}
+	return crypto.PubkeyToAddress(pubkey)
+}
+
+func ComputeSharedSecret(ephemeralPubKey []byte, privateKey *ecdsa.PrivateKey) common.Address {
+	curve := secp256k1.S256()
+	qX, qY := curve.ScalarMult(privateKey.X, privateKey.Y, ephemeralPubKey)
+	pubkey := ecdsa.PublicKey{Curve: curve, X: qX, Y: qY}
+	return crypto.PubkeyToAddress(pubkey)
+}

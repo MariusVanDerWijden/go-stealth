@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"errors"
 	"fmt"
@@ -11,6 +12,12 @@ import (
 	"github.com/MariusVanDerWijden/go-stealth/bindings"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
+)
+
+var (
+	secretKey *ecdsa.PrivateKey
+	client    ethclient.Client
 )
 
 func main() {
@@ -39,8 +46,9 @@ func scan(start uint64, addresses []common.Address, callers []common.Address, co
 	}
 	defer it.Close()
 	for it.Next() {
-		ev := it.Event
-		fmt.Printf("Found event: scheme: %v stealthAddr: %v caller: %v epheremeralPubKey: %v metadata: %v \n", ev.SchemeId, ev.StealthAddress, ev.Caller, ev.EphemeralPubKey, ev.Metadata)
+		if err := handleEvent(it.Event, client); err != nil {
+			return err
+		}
 	}
 	return it.Error()
 }
@@ -55,6 +63,22 @@ func wait(start uint64, addresses []common.Address, callers []common.Address, co
 	defer sub.Unsubscribe()
 	for {
 		ev := <-sink
-		fmt.Printf("Found event: scheme: %v stealthAddr: %v caller: %v epheremeralPubKey: %v metadata: %v \n", ev.SchemeId, ev.StealthAddress, ev.Caller, ev.EphemeralPubKey, ev.Metadata)
+		if err := handleEvent(ev, client); err != nil {
+			return err
+		}
 	}
+}
+
+func handleEvent(event *bindings.ERC5564AnnouncerAnnouncement, client ethclient.Client) error {
+	fmt.Printf("Found event: scheme: %v stealthAddr: %v caller: %v epheremeralPubKey: %v metadata: %v \n", event.SchemeId, event.StealthAddress, event.Caller, event.EphemeralPubKey, event.Metadata)
+	addr := gostealth.ComputeSharedSecret(event.EphemeralPubKey, secretKey)
+	// check if address has funds
+	bal, err := client.BalanceAt(context.Background(), addr, nil)
+	if err != nil {
+		return err
+	}
+	if bal.Cmp(new(big.Int)) != 0 {
+		fmt.Printf("Found my stealth address: %v with balance %v\n", addr, bal)
+	}
+	return nil
 }
