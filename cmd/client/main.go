@@ -1,14 +1,13 @@
 package main
 
 import (
-	"crypto/ecdsa"
+	"sync"
 
 	"github.com/fatih/color"
 	"github.com/manifoldco/promptui"
 
 	"github.com/MariusVanDerWijden/go-stealth/bindings"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
@@ -44,7 +43,7 @@ func mainLoop() error {
 
 	promptInit := promptui.Select{
 		Label: "Choose one of the following",
-		Items: []string{"View events", "Spend events"},
+		Items: []string{"View events", "Spend events", "Start daemon"},
 	}
 	for {
 		idx, _, err := promptInit.Run()
@@ -56,6 +55,8 @@ func mainLoop() error {
 			execView(client, contract)
 		case 1:
 			execSpend(client, contract)
+		case 2:
+			execDaemon(client, contract)
 		}
 	}
 }
@@ -84,44 +85,32 @@ func execSpend(client *ethclient.Client, contract *bindings.ERC5564Announcer) er
 	return Scan(client, contract, scanningSK, spendingSK)
 }
 
-func getScanningSK() (*ecdsa.PrivateKey, error) {
-	prompt := promptui.Prompt{Label: "Please provide the SCANNING secret key"}
-	str, err := prompt.Run()
+func execDaemon(client *ethclient.Client, contract *bindings.ERC5564Announcer) error {
+	scanningSK, err := getScanningSK()
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	scanningSK, err := crypto.HexToECDSA(str)
+	spendingPK, err := getSpendingPK()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return scanningSK, nil
-}
-
-func getSpendingSK() (*ecdsa.PrivateKey, error) {
-	prompt := promptui.Prompt{Label: "Please provide the SPENDING secret key"}
-	str, err := prompt.Run()
-	if err != nil {
-		return nil, err
+	sc := scanner{
+		scanningKey:       scanningSK,
+		spendingPublicKey: spendingPK,
+		client:            client,
 	}
-
-	spendingSK, err := crypto.HexToECDSA(str)
-	if err != nil {
-		return nil, err
+	// start the daemon
+	var wg *sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := sc.wait(contract); err != nil {
+			color.Red("Waiting failed in daemon: %v\n", err)
+		}
+	}()
+	if err := sc.scan(0, contract); err != nil {
+		color.Red("Scanning failed in daemon: %v\n", err)
 	}
-	return spendingSK, nil
-}
-
-func getSpendingPK() (*ecdsa.PublicKey, error) {
-	prompt := promptui.Prompt{Label: "Please provide the SPENDING public key"}
-	str, err := prompt.Run()
-	if err != nil {
-		return nil, err
-	}
-
-	spendingPK, err := crypto.UnmarshalPubkey(common.Hex2Bytes(str))
-	if err != nil {
-		return nil, err
-	}
-	return spendingPK, nil
+	wg.Wait()
+	return nil
 }

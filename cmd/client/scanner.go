@@ -55,10 +55,10 @@ func (s *scanner) scan(start uint64, contract *bindings.ERC5564Announcer) error 
 	return it.Error()
 }
 
-func (s *scanner) wait(start uint64, addresses []common.Address, callers []common.Address, contract *bindings.ERC5564Announcer) error {
+func (s *scanner) wait(contract *bindings.ERC5564Announcer) error {
 	schemeIDs := []*big.Int{new(big.Int)} // Secp256k1 has scheme id 0
 	sink := make(chan *bindings.ERC5564AnnouncerAnnouncement)
-	sub, err := contract.WatchAnnouncement(&bind.WatchOpts{}, sink, schemeIDs, addresses, callers)
+	sub, err := contract.WatchAnnouncement(&bind.WatchOpts{}, sink, schemeIDs, nil, nil)
 	if err != nil {
 		return err
 	}
