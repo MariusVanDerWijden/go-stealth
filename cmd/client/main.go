@@ -11,6 +11,11 @@ import (
 )
 
 func main() {
+	// Sepolia testdata
+	// https://rpc2.sepolia.org
+	// 0xFe6335f5dc5a469e74fB6a9FDAe116bFD5346365
+	// 45D342EB58207CB50824AD8D4E446AAE6C70DAA8C39E08E8F8B20E62CCC3BE31
+	// 03e017e9d9dbcb9ce5771acfce74c95bc0eafb5db37ef4b1ac62375f8e7a4c8aef
 	if err := mainLoop(); err != nil {
 		panic(err)
 	}
@@ -48,14 +53,21 @@ func mainLoop() error {
 		idx, _, err := promptInit.Run()
 		if err != nil {
 			color.Red("Goodbye: %v", err)
+			return nil
 		}
 		switch idx {
 		case 0:
-			execView(client, contract)
+			if err := execView(client, contract); err != nil {
+				color.Red("Error execution view: %v", err)
+			}
 		case 1:
-			execSpend(client, contract)
+			if err := execSpend(client, contract); err != nil {
+				color.Red("Error execution spend: %v", err)
+			}
 		case 2:
-			execDaemon(client, contract)
+			if err := execDaemon(client, contract); err != nil {
+				color.Red("Error execution daemon: %v", err)
+			}
 		}
 	}
 }
@@ -69,6 +81,7 @@ func execView(client *ethclient.Client, contract *bindings.ERC5564Announcer) err
 	if err != nil {
 		return err
 	}
+	color.Yellow("Starting view")
 	return scanner.ViewScan(client, contract, scanningSK, spendingPK)
 }
 
@@ -81,6 +94,7 @@ func execSpend(client *ethclient.Client, contract *bindings.ERC5564Announcer) er
 	if err != nil {
 		return err
 	}
+	color.Yellow("Starting scan")
 	return scanner.Scan(client, contract, scanningSK, spendingSK)
 }
 
@@ -93,5 +107,6 @@ func execDaemon(client *ethclient.Client, contract *bindings.ERC5564Announcer) e
 	if err != nil {
 		return err
 	}
+	color.Yellow("Starting daemon")
 	return scanner.Daemon(client, contract, scanningSK, spendingPK)
 }

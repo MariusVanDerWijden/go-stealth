@@ -43,7 +43,7 @@ func getSpendingPK() (*ecdsa.PublicKey, error) {
 		return nil, err
 	}
 
-	spendingPK, err := crypto.UnmarshalPubkey(common.Hex2Bytes(str))
+	spendingPK, err := crypto.DecompressPubkey(common.Hex2Bytes(str))
 	if err != nil {
 		return nil, err
 	}

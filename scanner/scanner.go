@@ -22,7 +22,7 @@ func ViewScan(client *ethclient.Client, contract *bindings.ERC5564Announcer, sca
 		spendingPublicKey: spendingKey,
 		client:            client,
 	}
-	return sc.scan(0, contract)
+	return sc.scan(5_000_000, contract)
 }
 
 func Scan(client *ethclient.Client, contract *bindings.ERC5564Announcer, scanningKey *ecdsa.PrivateKey, spendingKey *ecdsa.PrivateKey) error {
@@ -96,7 +96,7 @@ func (s *scanner) wait(contract *bindings.ERC5564Announcer) error {
 }
 
 func (s *scanner) handleEvent(event *bindings.ERC5564AnnouncerAnnouncement) error {
-	fmt.Printf("Found event: scheme: %v stealthAddr: %v caller: %v epheremeralPubKey: %v metadata: %v \n", event.SchemeId, event.StealthAddress, event.Caller, event.EphemeralPubKey, event.Metadata)
+	fmt.Printf("Found event: scheme: %v stealthAddr: %v caller: %v epheremeralPubKey: %x metadata: %x \n", event.SchemeId, event.StealthAddress, event.Caller, event.EphemeralPubKey, event.Metadata)
 	ephemeralPK, err := crypto.DecompressPubkey(event.EphemeralPubKey)
 	if err != nil {
 		fmt.Println("could not decompress ephemeral public key")
