@@ -30,7 +30,7 @@ func TestStaticTestCase(t *testing.T) {
 	bPrivSc, _ := crypto.HexToECDSA(bPrivScNum.Text(16))
 
 	wantStealthMA := "st:eth:0x03e017e9d9dbcb9ce5771acfce74c95bc0eafb5db37ef4b1ac62375f8e7a4c8aef021ba1833a9575bd2ad924440a20a80417437f77b0539cbc3f5bbaeeb2881efe04"
-	stealthMA := StealthAddress(&bPrivSp.PublicKey, &bPrivSc.PublicKey)
+	stealthMA := StealthMetaAddress(&bPrivSp.PublicKey, &bPrivSc.PublicKey)
 
 	if stealthMA != wantStealthMA {
 		t.Fatalf("stealthMA does not match, got %v want %v", stealthMA, wantStealthMA)
@@ -64,7 +64,7 @@ func TestStaticTestCase(t *testing.T) {
 		t.Fatal("invalid view tag")
 	}
 
-	dhSecret, err := ParseEvent(ephemeralPK, *stAddress, viewTag, bPrivSc, &bPrivSp.PublicKey)
+	dhSecret, err := ParseEventView(ephemeralPK, *stAddress, viewTag, bPrivSc, &bPrivSp.PublicKey)
 	if err != nil {
 		t.Fatal(err)
 	}

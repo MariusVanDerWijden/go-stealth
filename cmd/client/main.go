@@ -1,68 +1,127 @@
 package main
 
 import (
-	"context"
 	"crypto/ecdsa"
-	"fmt"
-	"math/big"
+
+	"github.com/fatih/color"
+	"github.com/manifoldco/promptui"
 
 	"github.com/MariusVanDerWijden/go-stealth/bindings"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-var (
-	secretKey *ecdsa.PrivateKey
-	client    ethclient.Client
-)
-
 func main() {
-
+	if err := mainLoop(); err != nil {
+		panic(err)
+	}
 }
 
-func scan(start uint64, addresses []common.Address, callers []common.Address, contract *bindings.ERC5564Announcer) error {
-	filterOpts := bind.FilterOpts{Start: start, End: nil, Context: context.Background()}
-	schemeIDs := []*big.Int{new(big.Int)} // Secp256k1 has scheme id 0
-	it, err := contract.FilterAnnouncement(&filterOpts, schemeIDs, addresses, callers)
+func mainLoop() error {
+	color.Green("Welcome to go-stealth")
+
+	prompt := promptui.Prompt{Label: "Please provide your RPC provider"}
+	str, err := prompt.Run()
 	if err != nil {
 		return err
 	}
-	defer it.Close()
-	for it.Next() {
-		if err := handleEvent(it.Event, client); err != nil {
-			return err
-		}
-	}
-	return it.Error()
-}
-
-func wait(start uint64, addresses []common.Address, callers []common.Address, contract *bindings.ERC5564Announcer) error {
-	schemeIDs := []*big.Int{new(big.Int)} // Secp256k1 has scheme id 0
-	sink := make(chan *bindings.ERC5564AnnouncerAnnouncement)
-	sub, err := contract.WatchAnnouncement(&bind.WatchOpts{}, sink, schemeIDs, addresses, callers)
+	client, err := ethclient.Dial(str)
 	if err != nil {
 		return err
 	}
-	defer sub.Unsubscribe()
+
+	prompt = promptui.Prompt{Label: "Please provide the contract address"}
+	str, err = prompt.Run()
+	if err != nil {
+		return err
+	}
+	cAddr := common.HexToAddress(str)
+	contract, err := bindings.NewERC5564Announcer(cAddr, client)
+	if err != nil {
+		return err
+	}
+
+	promptInit := promptui.Select{
+		Label: "Choose one of the following",
+		Items: []string{"View events", "Spend events"},
+	}
 	for {
-		ev := <-sink
-		if err := handleEvent(ev, client); err != nil {
-			return err
+		idx, _, err := promptInit.Run()
+		if err != nil {
+			color.Red("Goodbye: %v", err)
+		}
+		switch idx {
+		case 0:
+			execView(client, contract)
+		case 1:
+			execSpend(client, contract)
 		}
 	}
 }
 
-func handleEvent(event *bindings.ERC5564AnnouncerAnnouncement, client ethclient.Client) error {
-	fmt.Printf("Found event: scheme: %v stealthAddr: %v caller: %v epheremeralPubKey: %v metadata: %v \n", event.SchemeId, event.StealthAddress, event.Caller, event.EphemeralPubKey, event.Metadata)
-	var addr common.Address
-	// check if address has funds
-	bal, err := client.BalanceAt(context.Background(), addr, nil)
+func execView(client *ethclient.Client, contract *bindings.ERC5564Announcer) error {
+	scanningSK, err := getScanningSK()
 	if err != nil {
 		return err
 	}
-	if bal.Cmp(new(big.Int)) != 0 {
-		fmt.Printf("Found my stealth address: %v with balance %v\n", addr, bal)
+	spendingPK, err := getSpendingPK()
+	if err != nil {
+		return err
 	}
-	return nil
+	return ViewScan(client, contract, scanningSK, spendingPK)
+}
+
+func execSpend(client *ethclient.Client, contract *bindings.ERC5564Announcer) error {
+	scanningSK, err := getScanningSK()
+	if err != nil {
+		return err
+	}
+	spendingSK, err := getSpendingSK()
+	if err != nil {
+		return err
+	}
+	return Scan(client, contract, scanningSK, spendingSK)
+}
+
+func getScanningSK() (*ecdsa.PrivateKey, error) {
+	prompt := promptui.Prompt{Label: "Please provide the SCANNING secret key"}
+	str, err := prompt.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	scanningSK, err := crypto.HexToECDSA(str)
+	if err != nil {
+		return nil, err
+	}
+	return scanningSK, nil
+}
+
+func getSpendingSK() (*ecdsa.PrivateKey, error) {
+	prompt := promptui.Prompt{Label: "Please provide the SPENDING secret key"}
+	str, err := prompt.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	spendingSK, err := crypto.HexToECDSA(str)
+	if err != nil {
+		return nil, err
+	}
+	return spendingSK, nil
+}
+
+func getSpendingPK() (*ecdsa.PublicKey, error) {
+	prompt := promptui.Prompt{Label: "Please provide the SPENDING public key"}
+	str, err := prompt.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	spendingPK, err := crypto.UnmarshalPubkey(common.Hex2Bytes(str))
+	if err != nil {
+		return nil, err
+	}
+	return spendingPK, nil
 }

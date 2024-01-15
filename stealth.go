@@ -22,7 +22,7 @@ var (
 
 type ViewTag int
 
-func StealthAddress(spending, scanning *ecdsa.PublicKey) string {
+func StealthMetaAddress(spending, scanning *ecdsa.PublicKey) string {
 	return fmt.Sprintf("st:eth:0x%x%x", crypto.CompressPubkey(spending), crypto.CompressPubkey(scanning))
 }
 
@@ -57,7 +57,10 @@ func GenStealthAddress(address string, key *ecdsa.PrivateKey) (*common.Address, 
 	return &stealthAddr, &key.PublicKey, viewTag, nil
 }
 
-func ParseEvent(pubkey *ecdsa.PublicKey, stA common.Address, viewTag ViewTag, scanning *ecdsa.PrivateKey, spending *ecdsa.PublicKey) (*big.Int, error) {
+// ParseEventView returns the shared secret if the stealth address
+// belongs to us. If not an error is returned. This method does not
+// need the spending private key.
+func ParseEventView(pubkey *ecdsa.PublicKey, stA common.Address, viewTag ViewTag, scanning *ecdsa.PrivateKey, spending *ecdsa.PublicKey) (*big.Int, error) {
 	dhSecret := computeDHSecret(pubkey, scanning.D)
 	dhSecretHash := hashPK(dhSecret)
 	if getViewTag(dhSecretHash) != viewTag {
@@ -71,6 +74,17 @@ func ParseEvent(pubkey *ecdsa.PublicKey, stA common.Address, viewTag ViewTag, sc
 		return nil, ErrAddressMismatch
 	}
 	return dhSecretHash, nil
+}
+
+// ParseEvent returns the private key to spend the funds on the address
+// or an error if the address does not belong to our keys.
+func ParseEvent(pubkey *ecdsa.PublicKey, stA common.Address, viewTag ViewTag, scanning *ecdsa.PrivateKey, spending *ecdsa.PrivateKey) (*ecdsa.PrivateKey, error) {
+	secret, err := ParseEventView(pubkey, stA, viewTag, scanning, &spending.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+	_, key, err := stealthAddrPrivKey(secret, spending)
+	return key, err
 }
 
 func computeDHSecret(pk *ecdsa.PublicKey, secret *big.Int) *ecdsa.PublicKey {
