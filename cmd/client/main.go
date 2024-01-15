@@ -3,12 +3,9 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/rand"
-	"errors"
 	"fmt"
 	"math/big"
 
-	gostealth "github.com/MariusVanDerWijden/go-stealth"
 	"github.com/MariusVanDerWijden/go-stealth/bindings"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -22,19 +19,6 @@ var (
 
 func main() {
 
-}
-
-func generateStealthAddr() error {
-	var secret [32]byte
-	n, err := rand.Read(secret[:])
-	if err != nil || n != 32 {
-		return errors.New("error generating randomness")
-	}
-	pubKeyX, pubKeyY, addr := gostealth.NewStealthAddress(secret)
-	_ = pubKeyX
-	_ = pubKeyY
-	_ = addr
-	return nil
 }
 
 func scan(start uint64, addresses []common.Address, callers []common.Address, contract *bindings.ERC5564Announcer) error {
@@ -71,7 +55,7 @@ func wait(start uint64, addresses []common.Address, callers []common.Address, co
 
 func handleEvent(event *bindings.ERC5564AnnouncerAnnouncement, client ethclient.Client) error {
 	fmt.Printf("Found event: scheme: %v stealthAddr: %v caller: %v epheremeralPubKey: %v metadata: %v \n", event.SchemeId, event.StealthAddress, event.Caller, event.EphemeralPubKey, event.Metadata)
-	addr := gostealth.ComputeSharedSecret(event.EphemeralPubKey, secretKey)
+	var addr common.Address
 	// check if address has funds
 	bal, err := client.BalanceAt(context.Background(), addr, nil)
 	if err != nil {
