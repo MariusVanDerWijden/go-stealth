@@ -1,10 +1,11 @@
-package main
+package scanner
 
 import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"sync"
 
 	gostealth "github.com/MariusVanDerWijden/go-stealth"
 	"github.com/MariusVanDerWijden/go-stealth/bindings"
@@ -12,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/fatih/color"
 )
 
 func ViewScan(client *ethclient.Client, contract *bindings.ERC5564Announcer, scanningKey *ecdsa.PrivateKey, spendingKey *ecdsa.PublicKey) error {
@@ -30,6 +32,28 @@ func Scan(client *ethclient.Client, contract *bindings.ERC5564Announcer, scannin
 		client:      client,
 	}
 	return sc.scan(0, contract)
+}
+
+func Daemon(client *ethclient.Client, contract *bindings.ERC5564Announcer, scanningKey *ecdsa.PrivateKey, spendingKey *ecdsa.PublicKey) error {
+	sc := scanner{
+		scanningKey:       scanningKey,
+		spendingPublicKey: spendingKey,
+		client:            client,
+	}
+	// start the daemon
+	var wg *sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := sc.wait(contract); err != nil {
+			color.Red("Waiting failed in daemon: %v\n", err)
+		}
+	}()
+	if err := sc.scan(0, contract); err != nil {
+		color.Red("Scanning failed in daemon: %v\n", err)
+	}
+	wg.Wait()
+	return nil
 }
 
 type scanner struct {

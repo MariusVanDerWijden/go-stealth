@@ -1,12 +1,11 @@
 package main
 
 import (
-	"sync"
-
 	"github.com/fatih/color"
 	"github.com/manifoldco/promptui"
 
 	"github.com/MariusVanDerWijden/go-stealth/bindings"
+	"github.com/MariusVanDerWijden/go-stealth/scanner"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
@@ -70,7 +69,7 @@ func execView(client *ethclient.Client, contract *bindings.ERC5564Announcer) err
 	if err != nil {
 		return err
 	}
-	return ViewScan(client, contract, scanningSK, spendingPK)
+	return scanner.ViewScan(client, contract, scanningSK, spendingPK)
 }
 
 func execSpend(client *ethclient.Client, contract *bindings.ERC5564Announcer) error {
@@ -82,7 +81,7 @@ func execSpend(client *ethclient.Client, contract *bindings.ERC5564Announcer) er
 	if err != nil {
 		return err
 	}
-	return Scan(client, contract, scanningSK, spendingSK)
+	return scanner.Scan(client, contract, scanningSK, spendingSK)
 }
 
 func execDaemon(client *ethclient.Client, contract *bindings.ERC5564Announcer) error {
@@ -94,23 +93,5 @@ func execDaemon(client *ethclient.Client, contract *bindings.ERC5564Announcer) e
 	if err != nil {
 		return err
 	}
-	sc := scanner{
-		scanningKey:       scanningSK,
-		spendingPublicKey: spendingPK,
-		client:            client,
-	}
-	// start the daemon
-	var wg *sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := sc.wait(contract); err != nil {
-			color.Red("Waiting failed in daemon: %v\n", err)
-		}
-	}()
-	if err := sc.scan(0, contract); err != nil {
-		color.Red("Scanning failed in daemon: %v\n", err)
-	}
-	wg.Wait()
-	return nil
+	return scanner.Daemon(client, contract, scanningSK, spendingPK)
 }
