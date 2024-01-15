@@ -85,14 +85,14 @@ func (s *scanner) handleEvent(event *bindings.ERC5564AnnouncerAnnouncement) erro
 			fmt.Println("Event was not meant for us")
 			return nil
 		}
-		fmt.Println("Stealth address found: %v spendable with %v", addr, secretKey)
+		fmt.Printf("Stealth address found: %v spendable with %v\n", addr, secretKey)
 	} else {
 		dhSecret, err := gostealth.ParseEventView(ephemeralPK, event.StealthAddress, gostealth.ViewTag(event.Metadata[0]), s.scanningKey, s.spendingPublicKey)
 		if err != nil {
 			fmt.Println("Event was not meant for us")
 			return nil
 		}
-		fmt.Println("Stealth address found: %v spendable with secret %v and the spending sk", addr, dhSecret)
+		fmt.Printf("Stealth address found: %v spendable with secret %v and the spending sk\n", addr, dhSecret)
 	}
 	return checkAddress(addr, s.client)
 }
@@ -104,7 +104,7 @@ func checkAddress(addr common.Address, client *ethclient.Client) error {
 		return err
 	}
 	if bal.Cmp(new(big.Int)) != 0 {
-		fmt.Printf("Found a stealth address: %v with balance %v", addr, bal)
+		fmt.Printf("Found a stealth address: %v with balance %v\n", addr, bal)
 	}
 	return nil
 }
