@@ -1,12 +1,19 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"math/big"
+
 	"github.com/fatih/color"
 	"github.com/manifoldco/promptui"
 
 	"github.com/MariusVanDerWijden/go-stealth/bindings"
 	"github.com/MariusVanDerWijden/go-stealth/scanner"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
@@ -68,6 +75,10 @@ func mainLoop() error {
 			if err := execDaemon(client, contract); err != nil {
 				color.Red("Error execution daemon: %v", err)
 			}
+		case 3:
+			if err := execAnnounce(client, contract); err != nil {
+				color.Red("Error announcing stealth address: %v", err)
+			}
 		}
 	}
 }
@@ -109,4 +120,60 @@ func execDaemon(client *ethclient.Client, contract *bindings.ERC5564Announcer) e
 	}
 	color.Yellow("Starting daemon")
 	return scanner.Daemon(client, contract, scanningSK, spendingPK)
+}
+
+func execAnnounce(client *ethclient.Client, contract *bindings.ERC5564Announcer) error {
+	prompt := promptui.Prompt{Label: "Please provide the stealth address"}
+	str, err := prompt.Run()
+	if err != nil {
+		return err
+	}
+	address := common.HexToAddress(str)
+
+	prompt = promptui.Prompt{Label: "Please provide the ephemeral pubkey (in hex)"}
+	str, err = prompt.Run()
+	if err != nil {
+		return err
+	}
+	ephemeralPK := common.Hex2Bytes(str)
+
+	prompt = promptui.Prompt{Label: "Please provide the metadata (in hex)"}
+	str, err = prompt.Run()
+	if err != nil {
+		return err
+	}
+	metadata := common.Hex2Bytes(str)
+
+	prompt = promptui.Prompt{Label: "Please provide the key for sending the transaction (in hex)"}
+	str, err = prompt.Run()
+	if err != nil {
+		return err
+	}
+	key, err := crypto.HexToECDSA(str)
+	if err != nil {
+		return err
+	}
+
+	chainId, err := client.ChainID(context.Background())
+	if err != nil {
+		return err
+	}
+
+	opts, err := bind.NewKeyedTransactorWithChainID(key, chainId)
+	if err != nil {
+		return err
+	}
+
+	tx, err := contract.Announce(opts, new(big.Int), address, ephemeralPK, metadata)
+	if err != nil {
+		return err
+	}
+	receipt, err := bind.WaitMined(context.Background(), client, tx)
+	if err != nil {
+		return err
+	}
+	if receipt.Status != types.ReceiptStatusSuccessful {
+		return errors.New("transaction mined but failed")
+	}
+	return nil
 }
